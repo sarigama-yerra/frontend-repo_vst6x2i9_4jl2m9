@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import Spline from '@splinetool/react-spline'
 
 // Helper: API base URL
@@ -64,6 +64,7 @@ function Dashboard() {
   const { user } = useAuth()
   const name = user?.name || 'Sandhya'
   const nav = useNavigate()
+  const [quickSymptom, setQuickSymptom] = useState('')
 
   const cards = [
     { title: 'Check Symptoms', path: '/symptoms', emoji: '🩺' },
@@ -73,6 +74,18 @@ function Dashboard() {
     { title: 'Offline Mode', path: '/offline', emoji: '📶' },
   ]
 
+  const goAnalyze = () => {
+    if (!quickSymptom.trim()) return nav('/symptoms')
+    nav(`/symptoms?q=${encodeURIComponent(quickSymptom.trim())}`)
+  }
+
+  const onQuickKey = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      goAnalyze()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       <TopBar />
@@ -81,6 +94,18 @@ function Dashboard() {
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Hello {name}</h2>
           <p className="text-slate-600">Here’s your health overview</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+          <input
+            value={quickSymptom}
+            onChange={(e)=>setQuickSymptom(e.target.value)}
+            onKeyDown={onQuickKey}
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your symptom"
+          />
+          <button onClick={goAnalyze} className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg whitespace-nowrap">Analyze</button>
+          <button onClick={()=>nav('/consult')} className="bg-slate-800 hover:bg-slate-700 text-white font-semibold px-4 py-2 rounded-lg whitespace-nowrap">Book Consultation</button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -114,6 +139,30 @@ function SymptomChecker() {
   const [text, setText] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const q = params.get('q')
+    if (q) {
+      setText(q)
+      // auto analyze for deep-linked query
+      ;(async () => {
+        setLoading(true)
+        try {
+          const res = await fetch(`${API_BASE}/ai/analyze`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: q })
+          })
+          const data = await res.json()
+          setResult(data)
+        } catch (e) {
+          setResult({ possible_causes: ['Unable to analyze right now'] })
+        } finally {
+          setLoading(false)
+        }
+      })()
+    }
+  }, [location.search])
 
   const analyze = async () => {
     if (!text.trim()) return
