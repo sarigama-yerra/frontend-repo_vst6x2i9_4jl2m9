@@ -111,31 +111,61 @@ function Dashboard() {
 }
 
 function SymptomChecker() {
-  const [text, setText] = useState('High fever, body ache, chills since yesterday')
+  const [text, setText] = useState('')
   const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   const analyze = async () => {
-    const res = await fetch(`${API_BASE}/ai/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    })
-    const data = await res.json()
-    setResult(data)
+    if (!text.trim()) return
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/ai/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      const data = await res.json()
+      setResult(data)
+    } catch (e) {
+      setResult({ possible_causes: ['Unable to analyze right now'] })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const nav = useNavigate()
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      analyze()
+    }
+  }
+
+  const examples = ['High fever and body ache', 'Loss of smell and dry cough', 'Runny nose and sneezing']
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       <TopBar />
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-slate-800">AI Symptom Checker</h2>
-        <p className="text-slate-600">Get a quick, AI-assisted list of possible causes</p>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} className="mt-4 w-full min-h-[140px] rounded-lg border border-slate-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <div className="mt-4 flex gap-3">
-          <button onClick={analyze} className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg">Analyze</button>
-          <button onClick={() => nav('/consult')} className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-semibold px-4 py-2 rounded-lg">Book Consultation</button>
+        <p className="text-slate-600">Instant AI-based preliminary diagnosis</p>
+        <div className="mt-4 flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Enter your symptom"
+          />
+          <button onClick={analyze} className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg disabled:opacity-60" disabled={loading}>
+            {loading ? 'Analyzing…' : 'Analyze'}
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          {examples.map((ex) => (
+            <button key={ex} onClick={() => setText(ex)} className="px-3 py-1 rounded-full border border-slate-300 bg-white hover:bg-slate-50">{ex}</button>
+          ))}
         </div>
         {result && (
           <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
@@ -145,6 +175,7 @@ function SymptomChecker() {
                 <li key={c}>{c}</li>
               ))}
             </ul>
+            <button onClick={() => nav('/consult')} className="mt-4 bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg">Book Consultation</button>
           </div>
         )}
       </div>
